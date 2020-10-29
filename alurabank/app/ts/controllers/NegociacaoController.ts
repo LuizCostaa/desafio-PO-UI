@@ -2,6 +2,7 @@ import { NegociacoesView, MensagemView } from '../views/index';
 import { Negociacoes, Negociacao, NegociacaoParcial } from '../models/index';
 import { domInject, throttle } from '../helpers/decorators/index';
 import { NegociacaoService } from '../services/index';
+import { imprime } from '../helpers/index';
 
 export class NegociacaoController {
 
@@ -24,6 +25,7 @@ export class NegociacaoController {
         this._negociacoesView.update(this._negociacoes);
     }
 
+    @throttle()
     adiciona() {
 
         let data = new Date(this._inputData.val().replace(/-/g, ','));
@@ -40,7 +42,6 @@ export class NegociacaoController {
         );
 
         this._negociacoes.adiciona(negociacao);
-
         this._negociacoesView.update(this._negociacoes);
         this._mensagemView.update('Negociação adicionada com sucesso!');
     }
@@ -50,22 +51,30 @@ export class NegociacaoController {
     }
 
     @throttle()
-    importaDados() {
+    async importaDados() {
 
-        this._negociacaoService.obterNegociacoes(res => {
-            
-            if (res.ok) {
-                return res;
-            } else {
-                throw new Error(res.statusText);
-            }
+        try {
 
-        }).then(negociacoes => {
-            negociacoes.forEach(negociacao => {
-                this._negociacoes.adiciona(negociacao);
+            const negociacoesParaImportar = await this._negociacaoService.obterNegociacoes(res => {
+
+                if (res.ok) {
+                    return res;
+                } else {
+                    throw new Error(res.statusText);
+                }
             });
+
+            const negociacoesJaImportadas = this._negociacoes.paraArray();
+
+            negociacoesParaImportar.filter(negociacao => {
+                return !negociacoesJaImportadas.some(jaImportada => negociacao.ehIgual(jaImportada));
+            }).forEach(negociacao => this._negociacoes.adiciona(negociacao));
+
             this._negociacoesView.update(this._negociacoes);
-        });
+
+        } catch (err) {
+            this._mensagemView.update(err.message);
+        }
 
     }
 }
